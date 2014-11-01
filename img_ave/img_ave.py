@@ -13,48 +13,7 @@ from PIL import Image
 from scipy.io import loadmat
 
 
-## File name handling
-
-def tiff_name_parse(tn):
-    """Parse out a tiff name to moth, trial, and image number"""
-    moth = fn.split('-')[0].strip('Moth')
-    trial = int(fn.split('-')[1].split('_')[0].strip('P1'))
-    im_num = int(fn.split('-')[1].split('_')[1].strip('.tif'))
-    return moth, trial, im_num
-
-def parse_mat(fn):
-    """Load data from a .mat file, namely Argonne_2013_mothdata_sansWL.mat"""
-    m = loadmat(fn, chars_as_strings=True, struct_as_record = False, 
-                squeeze_me = True)
-    data = m.items()[0][-1]
-    return data
-
-def extract_precession(data):
-    """From .mat file, create dict of moths and trial precession values"""
-    precession = dict([(d.moth_label, map(bool, d.precess)) for d in data])
-    return precession
-
-
 # Begin things I cut-and-paste used.
-
-def get_tiffs_in_dir(dir):
-    """Change into the specified directory and get a list of tiffs there."""
-    # Get to the right directory
-    try: 
-        os.chdir(dir)
-    except:
-        raise Exception("No such dir, is it a full path?")
-    fns = os.listdir(os.getcwd())
-    # Ignore non-tiffs
-    istiff = lambda s: s.endswith('tif') or s.endswith('tiff')
-    fns = filter(istiff, fns)
-    return fns
-
-def get_trial_dirs_in_dir(dir):
-    """Return all the directories that are like 'T002'"""
-    os.chdir(dir)
-    dirnames = os.walk('.').next()[1]
-    return filter(lambda d: d.startswith('T'), dirnames)
 
 def redo_dirs(dir):
     """Take the files in the directory and split them into sub directories by
@@ -92,12 +51,14 @@ def np_to_tiff(array, name):
 
 # Actual top level functions
 
-def non_precess_ave(dir):
-    """Average the images in a directory, from a non precessing trial.
-    This means take the mean of every fifth image.
+def non_precess_ave(dir, fns = None, outdir = None):
+    """Average the images in a directory or list of image names in a directory,
+    from a non precessing trial. This means take the mean of every fifth image.
     """
     origdir = os.getcwd()
-    fns = get_tiffs_in_dir(dir)
+    os.chdir(dir)
+    if fns is None:
+        fns = get_tiffs_in_dir(dir)
     if len(fns)>505 or len(fns)<490:
         warnings.warn('Number of files seems high or low. Check on it.')
     # Divide tiffs into the five sets non-precessive trials have
@@ -105,8 +66,14 @@ def non_precess_ave(dir):
     # Get means
     means = [img_mean(fns) for fns in fn_by_time]
     # Save as TIFs
+    if outdir is not None:
+        os.chdir(outdir)
+    else:
+        os.chdir('..')
     for i in range(len(means)):
-        name = '../'+os.getcwd().split('/')[-1]+'Mean%03i.tif'%i
+        name = '%s_T%03i_Mean%03i.tif'%(fns[0].split('-')[0], 
+                                 int(fns[0].split('-')[1].split('_')[0][2:]), 
+                                 i)
         np_to_tiff(means[i], name)
     os.chdir(origdir)
 
